@@ -1,0 +1,30 @@
+[project]
+name = "moodle-painkillers"
+version = "0.1.0"
+description = "Signs you up on Moodle so you get paid."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.13.3",
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+moodle-painkillers = "moodle_painkillers:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.28.1",
+    "black>=25.1.0",
+    "ipython>=9.0.2",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.0.0",
+    "rich>=13.9.4",
+]
+
+[tool.black]
+line-length = 79
