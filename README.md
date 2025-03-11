@@ -45,7 +45,7 @@ Vous pouvez aussi lancer avec des arguments CLI (utilisez --help!).
 ## Build
 
 ```bash
-git clone https://github.com/username/moodle-painkillers.git
+git clone https://github.com/Safenein/moodle-painkillers.git
 cd moodle-painkillers
 
 uv sync  # ajouter "-E desktop" pour activer le support de notification sur macos et windows.
