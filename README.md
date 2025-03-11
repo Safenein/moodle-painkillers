@@ -1,5 +1,7 @@
 # Moodle Painkillers
 
+[![Build and Release Python Package](https://github.com/Safenein/moodle-painkillers/actions/workflows/build_release.yml/badge.svg)](https://github.com/Safenein/moodle-painkillers/actions/workflows/build_release.yml)
+
 A scripts to make Moodle presence status less painful.
 
 ```
