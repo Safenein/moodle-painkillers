@@ -154,7 +154,7 @@ def register_presence_status(session: rq.Session) -> None:
     a_element = soup.find("a", string="Envoyer le statut de présence")
     if not a_element:
         log.error("Could not find the presence status link on the page")
-        raise Exception("Could not find the send status cell.")
+        raise Exception("Could not find the send status cell. Did you already checked in?")
     assert isinstance(a_element, bs4.element.Tag)
 
     link_status_href = a_element["href"]
