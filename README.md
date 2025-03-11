@@ -26,7 +26,7 @@ using `pip`.
 pip install moodle_painkillers-*.whl
 ```
 
-Vous pouvez aussi installer des dépendances optionnelles, par exemple, pync sur macos ou win10toast pour windows afin d'activer les notifications sur votre bureau.
+You can also install optional dependencies, for example, pync on macOS or win10toast for Windows to enable desktop notifications.
 
 ## Usage
 
@@ -40,7 +40,7 @@ export DISCORD_WEBHOOK="$(pass show Discord/WebHookEmargement)"  # opt. to enabl
 python -m moodle_painkillers
 ```
 
-Vous pouvez aussi lancer avec des arguments CLI (utilisez --help!).
+You can also run with CLI arguments (use --help!).
 
 ## Build
 
@@ -48,7 +48,7 @@ Vous pouvez aussi lancer avec des arguments CLI (utilisez --help!).
 git clone https://github.com/Safenein/moodle-painkillers.git
 cd moodle-painkillers
 
-uv sync  # ajouter "-E desktop" pour activer le support de notification sur macos et windows.
+uv sync  # add "-E desktop" to enable notification support on macOS and Windows.
 uv run pytest --cov
 uv build
 ```
