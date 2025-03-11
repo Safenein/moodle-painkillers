@@ -10,23 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Récupérer tout l'historique pour les tags
       
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-      
       - name: Install uv
-        uses: astral-sh/setup-uv@v1 [[5]]
+        uses: astral-sh/setup-uv@v5
         with:
           uv-version: 'latest'
       
       - name: Build package with uv
         run: |
-          uv pip install build [[2]]
+          uv python install
+          uv pip install build
           uv pip run build
       
       - name: Get version from tag
