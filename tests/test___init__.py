@@ -381,7 +381,7 @@ class TestMain:
 
         # Call the main function and verify it raises NameError
         with pytest.raises(
-            NameError, match="Missing MOODLE_USERNAME or MOODLE_PASSWORD"
+            NameError, match="Missing Moodle credentials. Provide them via command line arguments or environment variables."
         ):
             main()
 
@@ -394,7 +394,7 @@ class TestMain:
 
         # Call the main function and verify it raises NameError
         with pytest.raises(
-            NameError, match="Missing MOODLE_USERNAME or MOODLE_PASSWORD"
+            NameError, match="Missing Moodle credentials. Provide them via command line arguments or environment variables."
         ):
             main()
 
