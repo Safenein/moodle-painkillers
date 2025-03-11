@@ -22,9 +22,8 @@ jobs:
       - name: Build package with uv
         run: |
           uv python install
-          uv pip install build
-          uv pip run build
-      
+          uv sync --no-dev
+          uv build      
       - name: Get version from tag
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
