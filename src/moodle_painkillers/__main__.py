@@ -1,5 +1,6 @@
 from . import main, parse_args
 from .discord import send_discord_notification
+from .desktop_notifications import send_notification
 
 args = parse_args()
 try:
@@ -10,3 +11,5 @@ except Exception as e:
 
 if args.discord_webhook:
     send_discord_notification(message, discord_webhook=args.discord_webhook)
+
+send_notification(message)
