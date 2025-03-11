@@ -17,7 +17,14 @@ This repository contains a solution to authenticate yourself on Moodle and tells
 
 ## Installation
 
-To install moodle-painkillers, download whl file in releases and 
+To install moodle-painkillers, download whl file in releases and install it
+using `pip`.
+
+```
+pip install moodle_painkillers-*.whl
+```
+
+Vous pouvez aussi installer des dépendances optionnelles, par exemple, pync sur macos ou win10toast pour windows afin d'activer les notifications sur votre bureau.
 
 ## Usage
 
@@ -31,13 +38,15 @@ export DISCORD_WEBHOOK="$(pass show Discord/WebHookEmargement)"  # opt. to enabl
 python -m moodle_painkillers
 ```
 
+Vous pouvez aussi lancer avec des arguments CLI (utilisez --help!).
+
 ## Build
 
 ```bash
 git clone https://github.com/username/moodle-painkillers.git
 cd moodle-painkillers
 
-uv sync
+uv sync  # ajouter "-E desktop" pour activer le support de notification sur macos et windows.
 uv run pytest --cov
 uv build
 ```
