@@ -24,18 +24,21 @@ def get_hidden_input_value(soup: bs4.BeautifulSoup, name: str) -> str:
         AssertionError: If the soup is not a BeautifulSoup object or name is not a string.
         ValueError: If the hidden input element with the specified name is not found.
     """
+    log.debug(f"Getting hidden input value for element named '{name}'")
     assert isinstance(soup, bs4.BeautifulSoup), "Invalid soup"
     assert isinstance(name, str), "Invalid name"
 
     input_element = soup.find("input", {"type": "hidden", "name": name})
 
     if not input_element:
+        log.error(f"Hidden input element '{name}' not found in the HTML")
         raise ValueError(f"Element {name} introuvable")
 
     assert isinstance(input_element, bs4.element.Tag)
     value = input_element["value"]
 
     assert isinstance(value, str), "Invalid value"
+    log.debug(f"Found hidden input value for '{name}'")
     return value
 
 
@@ -59,13 +62,19 @@ def authenticate_on_moodle(
     Returns:
         None
     """
+    log.info("Starting Moodle authentication process")
+    log.debug(f"Authenticating user: {username}")
+    
+    log.debug("Requesting Shibboleth login page")
     res = session.get(
         "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
     )
 
     if res.status_code != 200:
+        log.error(f"Failed to get login page: HTTP {res.status_code}")
         raise Exception(f"{res.status_code} Failed to get login page")
 
+    log.debug("Posting to Shibboleth login page")
     # Post the login form to be redirected on the shibboleth login page
     res = session.post(
         "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
@@ -74,14 +83,17 @@ def authenticate_on_moodle(
     )
 
     if res.status_code != 200:
+        log.error(f"Failed to authenticate on login page: HTTP {res.status_code}")
         raise Exception(
             f"{res.status_code} Failed to authenticate on login page"
         )
 
+    log.debug("Parsing login response page")
     soup = bs4.BeautifulSoup(res.text, "html.parser")
 
     execution_value = get_hidden_input_value(soup, "execution")
 
+    log.debug("Submitting credentials to Shibboleth")
     # Authenticate on shibboleth
     res = session.post(
         res.url.split("?")[0],
@@ -94,11 +106,14 @@ def authenticate_on_moodle(
         },
     )
 
+    log.debug("Parsing authentication response")
     soup = bs4.BeautifulSoup(res.text, "html.parser")
 
+    log.debug("Extracting SAML response parameters")
     relaystate_value = get_hidden_input_value(soup, "RelayState")
     samlresponse_value = get_hidden_input_value(soup, "SAMLResponse")
 
+    log.debug("Posting SAML response to service provider")
     res = session.post(
         "https://moodle.univ-ubs.fr/Shibboleth.sso/SAML2/POST",
         data={
@@ -106,6 +121,8 @@ def authenticate_on_moodle(
             "SAMLResponse": samlresponse_value,
         },
     )
+    
+    log.info("Authentication completed successfully")
 
 
 def register_presence_status(session: rq.Session) -> None:
@@ -123,23 +140,34 @@ def register_presence_status(session: rq.Session) -> None:
         Exception: If the link to send the presence status cannot be found.
         Exception: If the presence status registration fails.
     """
+    log.info("Starting presence status registration process")
+    
+    log.debug("Requesting attendance page")
     res = session.get(
         "https://moodle.univ-ubs.fr/mod/attendance/view.php?id=433340"
     )
 
+    log.debug("Parsing attendance page")
     soup = bs4.BeautifulSoup(res.text, "html.parser")
 
+    log.debug("Looking for presence status link")
     a_element = soup.find("a", string="Envoyer le statut de présence")
     if not a_element:
+        log.error("Could not find the presence status link on the page")
         raise Exception("Could not find the send status cell.")
     assert isinstance(a_element, bs4.element.Tag)
 
     link_status_href = a_element["href"]
     assert isinstance(link_status_href, str)
+    log.debug(f"Found presence status link: {link_status_href}")
 
+    log.debug("Sending presence status request")
     res = session.get(link_status_href)
     if "Votre présence à cette session a été enregistrée." not in res.text:
+        log.error("Failed to register presence status")
         raise Exception("Failed to register presence status.")
+
+    log.info("Successfully registered presence status")
 
 
 @dataclass
@@ -170,6 +198,7 @@ def parse_args():
         NameError: If either username or password is missing from both
                    command line arguments and environment variables.
     """
+    log.debug("Parsing command line arguments")
     parser = argparse.ArgumentParser(description="Moodle presence registration tool")
     parser.add_argument("--username", "-u", help="Moodle username")
     parser.add_argument("--password", "-p", help="Moodle password")
@@ -181,10 +210,13 @@ def parse_args():
     moodle_password = args.password or os.getenv("MOODLE_PASSWORD") or ""
     discord_webhook = args.discord_webhook or os.getenv("DISCORD_WEBHOOK") or ""
 
+    log.debug("Checking if credentials are provided")
     if not moodle_username or not moodle_password:
+        log.error("Missing Moodle credentials")
         raise NameError("Missing Moodle credentials. Provide them via command line arguments or environment variables.")
     
-    return Args(username=moodle_username, password=moodle_password)
+    log.debug("Arguments parsed successfully")
+    return Args(username=moodle_username, password=moodle_password, discord_webhook=discord_webhook)
 
 
 def main(args: Args | None):
@@ -198,22 +230,29 @@ def main(args: Args | None):
     Raises:
         NameError: If either MOODLE_USERNAME or MOODLE_PASSWORD environment variables are missing.
     """
+    log.info("Starting Moodle presence registration process")
+
     # Get moodle username and password from environment variables
     args = args or parse_args()
+    log.debug("Arguments obtained")
 
     # Open a session
+    log.debug("Creating new HTTP session")
     session = rq.Session()
 
     # Authenticate on moodle
-    authenticate_on_moodle(session, args.moodle_username, args.moodle_password)
+    authenticate_on_moodle(session, args.username, args.password)
 
     # Register presence status
     register_presence_status(session)
 
+    log.debug("Closing HTTP session")
     session.close()
+    
+    log.info("Presence registration process completed successfully")
 
     return
 
 
 if __name__ == "__main__":
-    main()
+    main(None)
