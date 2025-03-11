@@ -1,7 +1,9 @@
 import os
 import requests as rq
 from logging import getLogger
+from dataclasses import dataclass
 import bs4
+import argparse
 
 
 log = getLogger(__name__)
@@ -140,7 +142,52 @@ def register_presence_status(session: rq.Session) -> None:
         raise Exception("Failed to register presence status.")
 
 
-def main():
+@dataclass
+class Args:
+    """
+    A class that stores authentication credentials for Moodle.
+
+    Attributes:
+        username (str): The username for Moodle authentication.
+        password (str): The password for Moodle authentication.
+        discord_webhook (str): The Discord webhook URL for notifications.
+
+    """
+    username: str
+    password: str
+    discord_webhook: str
+
+
+def parse_args():
+    """
+    Parse command line arguments for Moodle credentials.
+    The function checks for username and password in the following order:
+    1. Command line arguments
+    2. Environment variables (MOODLE_USERNAME, MOODLE_PASSWORD)
+    Returns:
+        Args: An object containing the Moodle username and password.
+    Raises:
+        NameError: If either username or password is missing from both
+                   command line arguments and environment variables.
+    """
+    parser = argparse.ArgumentParser(description="Moodle presence registration tool")
+    parser.add_argument("--username", "-u", help="Moodle username")
+    parser.add_argument("--password", "-p", help="Moodle password")
+    parser.add_argument("--discord-webhook", "-w", help="Discord webhook URL for notifications")
+    args = parser.parse_args()
+    
+    # Get credentials from environment variables as fallback
+    moodle_username = args.username or os.getenv("MOODLE_USERNAME") or ""
+    moodle_password = args.password or os.getenv("MOODLE_PASSWORD") or ""
+    discord_webhook = args.discord_webhook or os.getenv("DISCORD_WEBHOOK") or ""
+
+    if not moodle_username or not moodle_password:
+        raise NameError("Missing Moodle credentials. Provide them via command line arguments or environment variables.")
+    
+    return Args(username=moodle_username, password=moodle_password)
+
+
+def main(args: Args | None):
     """
     Main function to authenticate on Moodle and register presence status.
 
@@ -152,17 +199,13 @@ def main():
         NameError: If either MOODLE_USERNAME or MOODLE_PASSWORD environment variables are missing.
     """
     # Get moodle username and password from environment variables
-    moodle_username = os.getenv("MOODLE_USERNAME") or ""
-    moodle_password = os.getenv("MOODLE_PASSWORD") or ""
-
-    if not moodle_username or not moodle_password:
-        raise NameError("Missing MOODLE_USERNAME or MOODLE_PASSWORD")
+    args = args or parse_args()
 
     # Open a session
     session = rq.Session()
 
     # Authenticate on moodle
-    authenticate_on_moodle(session, moodle_username, moodle_password)
+    authenticate_on_moodle(session, args.moodle_username, args.moodle_password)
 
     # Register presence status
     register_presence_status(session)

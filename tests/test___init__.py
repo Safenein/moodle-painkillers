@@ -7,6 +7,7 @@ from moodle_painkillers import (
     register_presence_status,
     get_hidden_input_value,
     main,
+    parse_args,
 )
 
 
@@ -437,3 +438,118 @@ class TestMain:
         # Call the main function and verify it propagates the exception
         with pytest.raises(Exception, match="Registration failed"):
             main()
+            class TestParseArgs:
+                @patch("moodle_painkillers.argparse.ArgumentParser")
+                @patch("moodle_painkillers.os.getenv")
+                def test_parse_args_command_line(self, mock_getenv, mock_argparser):
+                    # Setup mock for command line args
+                    mock_args = Mock()
+                    mock_args.username = "cli_user"
+                    mock_args.password = "cli_pass"
+                    mock_parser = Mock()
+                    mock_parser.parse_args.return_value = mock_args
+                    mock_argparser.return_value = mock_parser
+                    
+                    # Ensure environment vars aren't used
+                    mock_getenv.return_value = None
+                    
+                    # Call function
+                    result = parse_args()
+                    
+                    # Verify results
+                    assert result.username == "cli_user"
+                    assert result.password == "cli_pass"
+                    mock_getenv.assert_not_called()  # Environment vars shouldn't be checked
+                
+                @patch("moodle_painkillers.argparse.ArgumentParser")
+                @patch("moodle_painkillers.os.getenv")
+                def test_parse_args_environment_vars(self, mock_getenv, mock_argparser):
+                    # Setup mock for command line args (none provided)
+                    mock_args = Mock()
+                    mock_args.username = None
+                    mock_args.password = None
+                    mock_parser = Mock()
+                    mock_parser.parse_args.return_value = mock_args
+                    mock_argparser.return_value = mock_parser
+                    
+                    # Setup environment vars
+                    mock_getenv.side_effect = lambda key: {
+                        "MOODLE_USERNAME": "env_user",
+                        "MOODLE_PASSWORD": "env_pass"
+                    }.get(key)
+                    
+                    # Call function
+                    result = parse_args()
+                    
+                    # Verify results
+                    assert result.username == "env_user"
+                    assert result.password == "env_pass"
+                    mock_getenv.assert_any_call("MOODLE_USERNAME")
+                    mock_getenv.assert_any_call("MOODLE_PASSWORD")
+                
+                @patch("moodle_painkillers.argparse.ArgumentParser")
+                @patch("moodle_painkillers.os.getenv")
+                def test_parse_args_precedence(self, mock_getenv, mock_argparser):
+                    # Setup mock for command line args (username only)
+                    mock_args = Mock()
+                    mock_args.username = "cli_user"
+                    mock_args.password = None
+                    mock_parser = Mock()
+                    mock_parser.parse_args.return_value = mock_args
+                    mock_argparser.return_value = mock_parser
+                    
+                    # Setup environment vars (both username and password)
+                    mock_getenv.side_effect = lambda key: {
+                        "MOODLE_USERNAME": "env_user",
+                        "MOODLE_PASSWORD": "env_pass"
+                    }.get(key)
+                    
+                    # Call function
+                    result = parse_args()
+                    
+                    # Verify results - CLI username should take precedence
+                    assert result.username == "cli_user"
+                    assert result.password == "env_pass"
+                
+                @patch("moodle_painkillers.argparse.ArgumentParser")
+                @patch("moodle_painkillers.os.getenv")
+                def test_parse_args_missing_username(self, mock_getenv, mock_argparser):
+                    # Setup mock for command line args (none provided)
+                    mock_args = Mock()
+                    mock_args.username = None
+                    mock_args.password = "cli_pass"
+                    mock_parser = Mock()
+                    mock_parser.parse_args.return_value = mock_args
+                    mock_argparser.return_value = mock_parser
+                    
+                    # Setup environment vars (no username)
+                    mock_getenv.side_effect = lambda key: {
+                        "MOODLE_USERNAME": None,
+                        "MOODLE_PASSWORD": "env_pass"
+                    }.get(key)
+                    
+                    # Call function and expect error
+                    with pytest.raises(NameError, match="Missing Moodle credentials"):
+                        parse_args()
+                
+                @patch("moodle_painkillers.argparse.ArgumentParser")
+                @patch("moodle_painkillers.os.getenv")
+                def test_parse_args_missing_password(self, mock_getenv, mock_argparser):
+                    # Setup mock for command line args (none provided)
+                    mock_args = Mock()
+                    mock_args.username = "cli_user"
+                    mock_args.password = None
+                    mock_parser = Mock()
+                    mock_parser.parse_args.return_value = mock_args
+                    mock_argparser.return_value = mock_parser
+                    
+                    # Setup environment vars (no password)
+                    mock_getenv.side_effect = lambda key: {
+                        "MOODLE_USERNAME": "env_user",
+                        "MOODLE_PASSWORD": None
+                    }.get(key)
+                    
+                    # Call function and expect error
+                    with pytest.raises(NameError, match="Missing Moodle credentials"):
+                        parse_args()
+
