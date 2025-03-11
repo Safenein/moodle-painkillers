@@ -219,7 +219,7 @@ def parse_args():
     return Args(username=moodle_username, password=moodle_password, discord_webhook=discord_webhook)
 
 
-def main(args: Args | None):
+def main(args: Args | None = None):
     """
     Main function to authenticate on Moodle and register presence status.
 
