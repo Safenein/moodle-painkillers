@@ -1,14 +1,12 @@
-import pytest
-import bs4
 import os
-import requests as rq
 from unittest.mock import Mock, patch
-from moodle_painkillers import (
-    register_presence_status,
-    main,
-    parse_args,
-    notify_on_fail
-)
+
+import bs4
+import pytest
+import requests as rq
+
+from moodle_painkillers import (main, notify_on_fail, parse_args,
+                                register_presence_status)
 
 
 class TestRegisterPresenceStatus:
