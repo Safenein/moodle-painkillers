@@ -11,7 +11,9 @@ def send_notification(message: str, title: str) -> None:
     assert isinstance(title, str), "Title must be a string"
 
     if not win10toast:
-        raise ImportError("win10toast package is required for Windows notifications")
+        raise ImportError(
+            "win10toast package is required for Windows notifications"
+        )
 
     log.debug("Attempting to send Windows notification")
     toaster = win10toast.ToastNotifier()

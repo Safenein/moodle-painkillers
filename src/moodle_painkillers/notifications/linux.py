@@ -20,4 +20,6 @@ def send_notification(message: str, title: str) -> None:
         raise
     except FileNotFoundError as e:
         log.fatal(f"Could not send notification on Linux: {e}")
-        raise ImportError("notify-send command not found. Please install libnotify package")
+        raise ImportError(
+            "notify-send command not found. Please install libnotify package"
+        )
