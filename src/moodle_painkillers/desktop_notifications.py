@@ -5,7 +5,10 @@ from logging import getLogger
 log = getLogger(__name__)
 
 try:
+    import shutil
     import pync
+    if not shutil.which("terminal-notifier"):
+        raise ImportError("terminal-notifier not found. Install using brew!")
     macos_notification=True
     log.debug("pync module loaded successfully for macOS notifications")
 except ImportError:
