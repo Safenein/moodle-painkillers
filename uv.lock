@@ -289,16 +289,12 @@ wheels = [
 
 [[package]]
 name = "moodle-painkillers"
-version = "1.0.5"
+version = "1.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
-    { name = "requests" },
-]
-
-[package.optional-dependencies]
-desktop = [
     { name = "pync", marker = "sys_platform == 'darwin'" },
+    { name = "requests" },
     { name = "win10toast", marker = "sys_platform == 'win32'" },
 ]
 
@@ -316,11 +312,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.3" },
-    { name = "pync", marker = "sys_platform == 'darwin' and extra == 'desktop'", specifier = ">=2.0.3" },
+    { name = "pync", marker = "sys_platform == 'darwin'", specifier = ">=2.0.3" },
     { name = "requests", specifier = ">=2.32.3" },
-    { name = "win10toast", marker = "sys_platform == 'win32' and extra == 'desktop'", specifier = ">=0.9" },
+    { name = "win10toast", marker = "sys_platform == 'win32'", specifier = ">=0.9" },
 ]
-provides-extras = ["desktop"]
 
 [package.metadata.requires-dev]
 dev = [

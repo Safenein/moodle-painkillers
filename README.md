@@ -26,13 +26,6 @@ This will use the latest commit on `master`.
 pip install 'git+https://github.com/Safenein/moodle-painkillers.git'
 ```
 
-You can also install desktop dependencies, it will enable notifications on your desktop.
-Not needed on Linux.
-
-```
-pip install 'moodle-painkillers[desktop] @ git+https://github.com/Safenein/moodle-painkillers.git'
-```
-
 Windows notifications are untested. Feel free to open issues.
 
 MacOS users must install `terminal-notifier` for desktop notifications.
@@ -46,6 +39,7 @@ It should be already available without further actions.
 
 To launch the script, make sure you provide Moodle credentials.
 Here is an example of a script that would launch moodle-painkillers successfully.
+Secret management using pass, "the standard unix password manager".
 
 ```bash
 #!/usr/bin/env bash
@@ -76,7 +70,7 @@ Here is a crontab example. Read disclaimer.
 git clone https://github.com/Safenein/moodle-painkillers.git
 cd moodle-painkillers
 
-uv sync  # add "--extra desktop" to enable notification support on macOS and Windows.
+uv sync  # --no-dev pour ne pas installer les dépendances de developpement.
 uv run pytest
 uv build
 ```
