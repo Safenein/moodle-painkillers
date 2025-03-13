@@ -1,14 +1,15 @@
 import argparse
 import logging
 import os
+from ast import ParamSpec, TypeVar
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 import bs4
 import requests as rq
 
-from .notifications import send_notification
 from .moodle_authenticate import MoodleAuthenticatedSession
+from .notifications import send_notification
 
 log = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ def parse_args():
     )
 
 
-def notify_on_fail(func: Callable[[Any], Any]):
+def notify_on_fail[R](func: Callable[..., R]) -> Callable[..., R]:
     """
     Decorator to send a notification in case of failure.
 
@@ -164,7 +165,7 @@ def notify_on_fail(func: Callable[[Any], Any]):
         callable: The decorated function.
     """
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: object, **kwargs: object):
         try:
             return func(*args, **kwargs)
         except Exception as e:
@@ -212,11 +213,13 @@ def main() -> None:
 
     log.info("Presence registration process completed successfully")
     _ = send_notification(
-        "Sent presence status!", discord_webhook=args.discord_webhook
+        "Sent presence status!",
+        title=NOTIFICATION_TITLE,
+        discord_webhook=args.discord_webhook,
     )
 
     return
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

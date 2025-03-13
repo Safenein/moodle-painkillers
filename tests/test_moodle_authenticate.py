@@ -2,10 +2,8 @@ import bs4
 import pytest
 import requests
 
-from moodle_painkillers.moodle_authenticate import (
-    MoodleAuthenticatedSession,
-    get_hidden_input_value,
-)
+from moodle_painkillers.moodle_authenticate import (MoodleAuthenticatedSession,
+                                                    get_hidden_input_value)
 
 
 class TestGetHiddenInputValue:

@@ -1,5 +1,5 @@
-import subprocess
 import shutil
+import subprocess
 from logging import getLogger
 
 log = getLogger(__name__)

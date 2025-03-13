@@ -5,12 +5,8 @@ import bs4
 import pytest
 import requests as rq
 
-from moodle_painkillers import (
-    main,
-    notify_on_fail,
-    parse_args,
-    register_presence_status,
-)
+from moodle_painkillers import (main, notify_on_fail, parse_args,
+                                register_presence_status)
 
 
 class TestRegisterPresenceStatus:
@@ -244,7 +240,9 @@ class TestNotifyOnFail:
         assert excinfo.value == test_exception
 
         # Verify send_notification was called with the exception message
-        mock_send_notification.assert_called_once_with('test error', title='Moodle Presence Registration')
+        mock_send_notification.assert_called_once_with(
+            "test error", title="Moodle Presence Registration"
+        )
 
     @patch("moodle_painkillers.send_notification")
     def test_with_arguments(self, mock_send_notification):
@@ -294,7 +292,9 @@ class TestMain:
         mock_session_class.assert_called_once_with("test_user", "test_pass")
         mock_register_presence.assert_called_once_with(mock_session)
         mock_send_notification.assert_called_once_with(
-            "Sent presence status!", discord_webhook="test_webhook"
+            "Sent presence status!",
+            title="Moodle Presence Registration",
+            discord_webhook="test_webhook",
         )
 
     @patch("moodle_painkillers.send_notification")
@@ -324,7 +324,9 @@ class TestMain:
 
         # Verify notification called with None webhook
         mock_send_notification.assert_called_once_with(
-            "Sent presence status!", discord_webhook=None
+            "Sent presence status!",
+            title="Moodle Presence Registration",
+            discord_webhook=None,
         )
 
     @patch("moodle_painkillers.register_presence_status")
