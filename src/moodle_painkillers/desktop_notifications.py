@@ -1,6 +1,7 @@
 import platform
 import subprocess
 from logging import getLogger
+
 from .discord import send_discord_notification
 
 log = getLogger(__name__)
@@ -11,6 +12,7 @@ NOTIFICATION_TITLE = "Moodle Painkillers"
 
 try:
     import shutil
+
     import pync
 
     if not shutil.which("terminal-notifier"):

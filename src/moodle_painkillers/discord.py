@@ -1,7 +1,8 @@
-import os
 import json
-import requests as rq
 import logging
+import os
+
+import requests as rq
 
 # Set up logger for this module
 log = logging.getLogger(__name__)

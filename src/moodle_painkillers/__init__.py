@@ -1,21 +1,21 @@
-import os
-import requests as rq
-import logging
-from dataclasses import dataclass
-import bs4
 import argparse
+import logging
+import os
+from dataclasses import dataclass
 from typing import Any, Callable
+
+import bs4
+import requests as rq
 
 from .desktop_notifications import send_notification
 from .moodle_authenticate import MoodleAuthenticatedSession
-
 
 log = logging.getLogger(__name__)
 
 
 try:
-    from rich.traceback import install as install_rich_traceback
     from rich.logging import RichHandler
+    from rich.traceback import install as install_rich_traceback
 
     # Install rich traceback for better exception visualization
     _ = install_rich_traceback(show_locals=True)

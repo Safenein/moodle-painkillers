@@ -1,6 +1,7 @@
-import requests as rq
 from logging import getLogger
+
 import bs4
+import requests as rq
 
 log = getLogger(__name__)
 
