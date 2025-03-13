@@ -1,254 +1,14 @@
 import pytest
 import bs4
+import os
 import requests as rq
 from unittest.mock import Mock, patch
 from moodle_painkillers import (
-    authenticate_on_moodle,
     register_presence_status,
-    get_hidden_input_value,
     main,
     parse_args,
+    notify_on_fail
 )
-
-
-class TestGetHiddenInputValue:
-    def test_get_hidden_input_value_valid(self):
-        # Create a valid BeautifulSoup object with a hidden input
-        html = '<html><form><input type="hidden" name="test_name" value="test_value"></form></html>'
-        soup = bs4.BeautifulSoup(html, "html.parser")
-
-        # Test valid retrieval
-        assert get_hidden_input_value(soup, "test_name") == "test_value"
-
-    def test_get_hidden_input_value_invalid_soup(self):
-        # Test with invalid soup (not BeautifulSoup)
-        with pytest.raises(AssertionError, match="Invalid soup"):
-            get_hidden_input_value("not a soup", "test_name")
-
-    def test_get_hidden_input_value_invalid_name(self):
-        # Test with invalid name (not string)
-        html = '<html><form><input type="hidden" name="test_name" value="test_value"></form></html>'
-        soup = bs4.BeautifulSoup(html, "html.parser")
-
-        with pytest.raises(AssertionError, match="Invalid name"):
-            get_hidden_input_value(soup, 123)
-
-    def test_get_hidden_input_value_element_not_found(self):
-        # Test when element is not found
-        html = '<html><form><input type="hidden" name="test_name" value="test_value"></form></html>'
-        soup = bs4.BeautifulSoup(html, "html.parser")
-
-        with pytest.raises(ValueError, match="Element nonexistent introuvable"):
-            get_hidden_input_value(soup, "nonexistent")
-
-    def test_get_hidden_input_value_complex_html(self):
-        # Test with more complex HTML
-        html = """
-        <html>
-            <body>
-                <form>
-                    <div>
-                        <input type="text" name="visible" value="visible_value">
-                        <input type="hidden" name="hidden1" value="hidden1_value">
-                        <input type="hidden" name="hidden2" value="hidden2_value">
-                    </div>
-                </form>
-            </body>
-        </html>
-        """
-        soup = bs4.BeautifulSoup(html, "html.parser")
-
-        assert get_hidden_input_value(soup, "hidden1") == "hidden1_value"
-        assert get_hidden_input_value(soup, "hidden2") == "hidden2_value"
-
-
-class TestAuthenticateOnMoodle:
-
-    def test_authenticate_successful(self):
-        # Mock session and responses
-        mock_session = Mock(spec=rq.Session)
-
-        # Mock the first GET response
-        mock_get_response = Mock()
-        mock_get_response.status_code = 200
-        mock_get_response.cookies = {"cookie": "value"}
-
-        # Mock the first POST response
-        mock_post_response1 = Mock()
-        mock_post_response1.status_code = 200
-        mock_post_response1.text = """
-            <html><form>
-                <input type="hidden" name="execution" value="execution_value">
-            </form></html>
-        """
-        mock_post_response1.url = "https://example.com/login?param=1"
-
-        # Mock the second POST response (authentication)
-        mock_post_response2 = Mock()
-        mock_post_response2.status_code = 200
-        mock_post_response2.text = """
-            <html><form>
-                <input type="hidden" name="RelayState" value="relay_state_value">
-                <input type="hidden" name="SAMLResponse" value="saml_response_value">
-            </form></html>
-        """
-
-        # Mock the final POST response
-        mock_post_response3 = Mock()
-        mock_post_response3.status_code = 200
-
-        # Set up the session mock to return our mocked responses
-        mock_session.get.return_value = mock_get_response
-        mock_session.post.side_effect = [
-            mock_post_response1,
-            mock_post_response2,
-            mock_post_response3,
-        ]
-
-        # Call the function
-        authenticate_on_moodle(mock_session, "test_username", "test_password")
-
-        # Verify correct calls were made
-        mock_session.get.assert_called_once_with(
-            "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
-        )
-
-        assert mock_session.post.call_count == 3
-
-        # Verify first POST call
-        mock_session.post.assert_any_call(
-            "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
-            cookies=mock_get_response.cookies,
-            data={"idp": "urn:mace:cru.fr:federation:univ-ubs.fr"},
-        )
-
-        # Verify second POST call (authentication)
-        mock_session.post.assert_any_call(
-            "https://example.com/login",  # URL without parameters
-            data={
-                "username": "test_username",
-                "password": "test_password",
-                "execution": "execution_value",
-                "_eventId": "submit",
-                "geolocation": "",
-            },
-        )
-
-        # Verify third POST call
-        mock_session.post.assert_any_call(
-            "https://moodle.univ-ubs.fr/Shibboleth.sso/SAML2/POST",
-            data={
-                "RelayState": "relay_state_value",
-                "SAMLResponse": "saml_response_value",
-            },
-        )
-
-    def test_get_login_page_failure(self):
-        # Test failure when getting the login page fails
-        mock_session = Mock(spec=rq.Session)
-
-        # Mock a failed GET response
-        mock_get_response = Mock()
-        mock_get_response.status_code = 404
-        mock_session.get.return_value = mock_get_response
-
-        # Verify exception is raised
-        with pytest.raises(Exception, match="404 Failed to get login page"):
-            authenticate_on_moodle(
-                mock_session, "test_username", "test_password"
-            )
-
-    def test_post_login_failure(self):
-        # Test failure when posting to the login page fails
-        mock_session = Mock(spec=rq.Session)
-
-        # Mock the first GET response (success)
-        mock_get_response = Mock()
-        mock_get_response.status_code = 200
-        mock_get_response.cookies = {"cookie": "value"}
-
-        # Mock the first POST response (failure)
-        mock_post_response = Mock()
-        mock_post_response.status_code = 500
-
-        # Set up the session mock
-        mock_session.get.return_value = mock_get_response
-        mock_session.post.return_value = mock_post_response
-
-        # Verify exception is raised
-        with pytest.raises(
-            Exception, match="500 Failed to authenticate on login page"
-        ):
-            authenticate_on_moodle(
-                mock_session, "test_username", "test_password"
-            )
-
-    def test_missing_execution_value(self):
-        # Test when execution value is missing in response
-        mock_session = Mock(spec=rq.Session)
-
-        # Mock the first GET response
-        mock_get_response = Mock()
-        mock_get_response.status_code = 200
-        mock_get_response.cookies = {"cookie": "value"}
-
-        # Mock the first POST response with missing execution field
-        mock_post_response = Mock()
-        mock_post_response.status_code = 200
-        mock_post_response.text = (
-            "<html><form></form></html>"  # No execution input
-        )
-
-        # Set up the session mock
-        mock_session.get.return_value = mock_get_response
-        mock_session.post.return_value = mock_post_response
-
-        # Verify exception is raised when the execution value is not found
-        with pytest.raises(ValueError, match="Element execution introuvable"):
-            authenticate_on_moodle(
-                mock_session, "test_username", "test_password"
-            )
-
-    def test_missing_relay_state_value(self):
-        # Test when RelayState value is missing in response
-        mock_session = Mock(spec=rq.Session)
-
-        # Mock the first GET response
-        mock_get_response = Mock()
-        mock_get_response.status_code = 200
-        mock_get_response.cookies = {"cookie": "value"}
-
-        # Mock the first POST response
-        mock_post_response1 = Mock()
-        mock_post_response1.status_code = 200
-        mock_post_response1.text = """
-            <html><form>
-                <input type="hidden" name="execution" value="execution_value">
-            </form></html>
-        """
-        mock_post_response1.url = "https://example.com/login"
-
-        # Mock the second POST response with missing RelayState
-        mock_post_response2 = Mock()
-        mock_post_response2.status_code = 200
-        mock_post_response2.text = """
-            <html><form>
-                <input type="hidden" name="SAMLResponse" value="saml_response_value">
-            </form></html>
-        """
-
-        # Set up the session mock
-        mock_session.get.return_value = mock_get_response
-        mock_session.post.side_effect = [
-            mock_post_response1,
-            mock_post_response2,
-        ]
-
-        # Verify exception is raised when RelayState is not found
-        with pytest.raises(Exception, match="Failed to extract SAML response parameters. Are the credentials correct?"):
-            authenticate_on_moodle(
-                mock_session, "test_username", "test_password"
-            )
 
 
 class TestRegisterPresenceStatus:
@@ -344,212 +104,229 @@ class TestRegisterPresenceStatus:
             register_presence_status(mock_session)
 
 
+
+class TestParseArgs:
+    @patch("moodle_painkillers.argparse.ArgumentParser.parse_args")
+    @patch.dict(os.environ, {}, clear=True)
+    def test_parse_args_command_line(self, mock_parse_args):
+        # Test parsing arguments from command line only
+        mock_args = Mock()
+        mock_args.username = "cmd_username"
+        mock_args.password = "cmd_password"
+        mock_args.discord_webhook = "cmd_webhook"
+        mock_parse_args.return_value = mock_args
+        
+        result = parse_args()
+        
+        assert result.username == "cmd_username"
+        assert result.password == "cmd_password"
+        assert result.discord_webhook == "cmd_webhook"
+        mock_parse_args.assert_called_once()
+    
+    @patch("moodle_painkillers.argparse.ArgumentParser.parse_args")
+    @patch.dict(os.environ, {
+        "MOODLE_USERNAME": "env_username", 
+        "MOODLE_PASSWORD": "env_password",
+        "DISCORD_WEBHOOK": "env_webhook"
+    })
+    def test_parse_args_environment(self, mock_parse_args):
+        # Test parsing arguments from environment variables
+        mock_args = Mock()
+        mock_args.username = None
+        mock_args.password = None
+        mock_args.discord_webhook = None
+        mock_parse_args.return_value = mock_args
+        
+        result = parse_args()
+        
+        assert result.username == "env_username"
+        assert result.password == "env_password"
+        assert result.discord_webhook == "env_webhook"
+        mock_parse_args.assert_called_once()
+    
+    @patch("moodle_painkillers.argparse.ArgumentParser.parse_args")
+    @patch.dict(os.environ, {
+        "MOODLE_USERNAME": "env_username", 
+        "MOODLE_PASSWORD": "env_password",
+        "DISCORD_WEBHOOK": "env_webhook"
+    })
+    def test_parse_args_precedence(self, mock_parse_args):
+        # Test that command line args take precedence over environment variables
+        mock_args = Mock()
+        mock_args.username = "cmd_username"
+        mock_args.password = None  # Use env for password
+        mock_args.discord_webhook = "cmd_webhook"
+        mock_parse_args.return_value = mock_args
+        
+        result = parse_args()
+        
+        assert result.username == "cmd_username"  # From command line
+        assert result.password == "env_password"  # From environment
+        assert result.discord_webhook == "cmd_webhook"  # From command line
+        mock_parse_args.assert_called_once()
+    
+    @patch("moodle_painkillers.argparse.ArgumentParser.parse_args")
+    @patch.dict(os.environ, {}, clear=True)
+    def test_parse_args_missing_credentials(self, mock_parse_args):
+        # Test error when credentials are missing
+        mock_args = Mock()
+        mock_args.username = None
+        mock_args.password = None
+        mock_args.discord_webhook = None
+        mock_parse_args.return_value = mock_args
+        
+        with pytest.raises(NameError, match="Missing Moodle credentials"):
+            parse_args()
+        
+        mock_parse_args.assert_called_once()
+    
+    @patch("moodle_painkillers.argparse.ArgumentParser.parse_args")
+    @patch.dict(os.environ, {
+        "MOODLE_USERNAME": "env_username", 
+        "MOODLE_PASSWORD": "env_password"
+    })
+    def test_parse_args_missing_webhook(self, mock_parse_args):
+        # Test that missing webhook doesn't cause error
+        mock_args = Mock()
+        mock_args.username = None
+        mock_args.password = None
+        mock_args.discord_webhook = None
+        mock_parse_args.return_value = mock_args
+        
+        result = parse_args()
+        
+        assert result.username == "env_username"
+        assert result.password == "env_password"
+        assert result.discord_webhook is None  # Webhook is optional
+        mock_parse_args.assert_called_once()
+
+
+class TestNotifyOnFail:
+    @patch("moodle_painkillers.send_notification")
+    def test_success_case(self, mock_send_notification):
+        # Test that when the decorated function succeeds,
+        # it returns the correct value and doesn't call send_notification
+        
+        @notify_on_fail
+        def success_func():
+            return "success"
+        
+        result = success_func()
+        
+        assert result == "success"
+        mock_send_notification.assert_not_called()
+    
+    @patch("moodle_painkillers.send_notification")
+    def test_failure_case(self, mock_send_notification):
+        # Test that when the decorated function fails,
+        # send_notification is called and the exception is re-raised
+        
+        test_exception = ValueError("test error")
+        
+        @notify_on_fail
+        def failing_func():
+            raise test_exception
+        
+        # The exception should be re-raised
+        with pytest.raises(ValueError) as excinfo:
+            failing_func()
+        
+        # Verify the exception is the same one we raised
+        assert excinfo.value == test_exception
+        
+        # Verify send_notification was called with the exception message
+        mock_send_notification.assert_called_once_with("test error")
+    
+    @patch("moodle_painkillers.send_notification")
+    def test_with_arguments(self, mock_send_notification):
+        # Test that the decorator properly passes arguments to the function
+        
+        @notify_on_fail
+        def func_with_args(a, b, c=3):
+            return a + b + c
+        
+        result = func_with_args(1, 2)
+        assert result == 6
+        
+        result = func_with_args(1, 2, c=10)
+        assert result == 13
+        
+        mock_send_notification.assert_not_called()
+
+
 class TestMain:
-    @patch("moodle_painkillers.os.getenv")
-    @patch("moodle_painkillers.rq.Session")
-    @patch("moodle_painkillers.authenticate_on_moodle")
+    @patch("moodle_painkillers.send_notification")
     @patch("moodle_painkillers.register_presence_status")
-    def test_main_successful(
-        self, mock_register, mock_auth, mock_session, mock_getenv
+    @patch("moodle_painkillers.MoodleAuthenticatedSession")
+    @patch("moodle_painkillers.parse_args")
+    def test_main_successful_workflow(
+        self, mock_parse_args, mock_session_class, 
+        mock_register_presence, mock_send_notification
     ):
-        # Mock environment variables
-        mock_getenv.side_effect = lambda x: (
-            "test_value"
-            if x in ("MOODLE_USERNAME", "MOODLE_PASSWORD")
-            else None
-        )
-
-        # Mock session
-        mock_session_instance = mock_session.return_value
-
-        # Call the main function
+        # Setup mocks
+        mock_args = Mock()
+        mock_args.username = "test_user"
+        mock_args.password = "test_pass"
+        mock_args.discord_webhook = "test_webhook"
+        mock_parse_args.return_value = mock_args
+        
+        # Mock session context manager
+        mock_session = Mock()
+        mock_session_class.return_value.__enter__.return_value = mock_session
+        
+        # Call main function
         main()
+        
+        # Verify all methods were called with correct parameters
+        mock_parse_args.assert_called_once()
+        mock_session_class.assert_called_once_with("test_user", "test_pass")
+        mock_register_presence.assert_called_once_with(mock_session)
+        mock_send_notification.assert_called_once_with("Sent presence status!", discord_webhook="test_webhook")
 
-        # Verify all steps were called
-        mock_auth.assert_called_once_with(
-            mock_session_instance, "test_value", "test_value"
-        )
-        mock_register.assert_called_once_with(mock_session_instance)
-        mock_session_instance.close.assert_called_once()
-
-    @patch("moodle_painkillers.os.getenv")
-    def test_main_missing_username(self, mock_getenv):
-        # Mock missing username
-        mock_getenv.side_effect = lambda x: (
-            "test_value" if x == "MOODLE_PASSWORD" else ""
-        )
-
-        # Call the main function and verify it raises NameError
-        with pytest.raises(
-            NameError, match="Missing Moodle credentials. Provide them via command line arguments or environment variables."
-        ):
-            main()
-
-    @patch("moodle_painkillers.os.getenv")
-    def test_main_missing_password(self, mock_getenv):
-        # Mock missing password
-        mock_getenv.side_effect = lambda x: (
-            "test_value" if x == "MOODLE_USERNAME" else ""
-        )
-
-        # Call the main function and verify it raises NameError
-        with pytest.raises(
-            NameError, match="Missing Moodle credentials. Provide them via command line arguments or environment variables."
-        ):
-            main()
-
-    @patch("moodle_painkillers.os.getenv")
-    @patch("moodle_painkillers.rq.Session")
-    @patch("moodle_painkillers.authenticate_on_moodle")
-    def test_main_authentication_failure(
-        self, mock_auth, mock_session, mock_getenv
-    ):
-        # Mock environment variables
-        mock_getenv.side_effect = lambda x: (
-            "test_value"
-            if x in ("MOODLE_USERNAME", "MOODLE_PASSWORD")
-            else None
-        )
-
-        # Mock authentication failure
-        mock_auth.side_effect = Exception("Authentication failed")
-
-        # Call the main function and verify it propagates the exception
-        with pytest.raises(Exception, match="Authentication failed"):
-            main()
-
-    @patch("moodle_painkillers.os.getenv")
-    @patch("moodle_painkillers.rq.Session")
-    @patch("moodle_painkillers.authenticate_on_moodle")
+    @patch("moodle_painkillers.send_notification")
     @patch("moodle_painkillers.register_presence_status")
-    def test_main_registration_failure(
-        self, mock_register, mock_auth, mock_session, mock_getenv
+    @patch("moodle_painkillers.MoodleAuthenticatedSession")
+    @patch("moodle_painkillers.parse_args") 
+    def test_main_without_webhook(
+        self, mock_parse_args, mock_session_class,
+        mock_register_presence, mock_send_notification
     ):
-        # Mock environment variables
-        mock_getenv.side_effect = lambda x: (
-            "test_value"
-            if x in ("MOODLE_USERNAME", "MOODLE_PASSWORD")
-            else None
-        )
+        # Setup mocks with no webhook
+        mock_args = Mock()
+        mock_args.username = "test_user"
+        mock_args.password = "test_pass"
+        mock_args.discord_webhook = None
+        mock_parse_args.return_value = mock_args
+        
+        # Mock session context manager
+        mock_session = Mock()
+        mock_session_class.return_value.__enter__.return_value = mock_session
+        
+        # Call main function
+        main()
+        
+        # Verify notification called with None webhook
+        mock_send_notification.assert_called_once_with("Sent presence status!", discord_webhook=None)
 
-        # Mock registration failure
-        mock_register.side_effect = Exception("Registration failed")
-
-        # Call the main function and verify it propagates the exception
+    @patch("moodle_painkillers.register_presence_status")
+    @patch("moodle_painkillers.MoodleAuthenticatedSession")
+    @patch("moodle_painkillers.parse_args")
+    def test_main_error_in_registration(
+        self, mock_parse_args, mock_session_class, mock_register_presence
+    ):
+        # Setup mocks
+        mock_args = Mock()
+        mock_parse_args.return_value = mock_args
+        
+        # Mock session context manager
+        mock_session = Mock()
+        mock_session_class.return_value.__enter__.return_value = mock_session
+        
+        # Make register_presence_status raise an exception
+        mock_register_presence.side_effect = Exception("Registration failed")
+        
+        # The function is decorated with notify_on_fail, so the exception will be raised
         with pytest.raises(Exception, match="Registration failed"):
             main()
-            class TestParseArgs:
-                @patch("moodle_painkillers.argparse.ArgumentParser")
-                @patch("moodle_painkillers.os.getenv")
-                def test_parse_args_command_line(self, mock_getenv, mock_argparser):
-                    # Setup mock for command line args
-                    mock_args = Mock()
-                    mock_args.username = "cli_user"
-                    mock_args.password = "cli_pass"
-                    mock_parser = Mock()
-                    mock_parser.parse_args.return_value = mock_args
-                    mock_argparser.return_value = mock_parser
-                    
-                    # Ensure environment vars aren't used
-                    mock_getenv.return_value = None
-                    
-                    # Call function
-                    result = parse_args()
-                    
-                    # Verify results
-                    assert result.username == "cli_user"
-                    assert result.password == "cli_pass"
-                    mock_getenv.assert_not_called()  # Environment vars shouldn't be checked
-                
-                @patch("moodle_painkillers.argparse.ArgumentParser")
-                @patch("moodle_painkillers.os.getenv")
-                def test_parse_args_environment_vars(self, mock_getenv, mock_argparser):
-                    # Setup mock for command line args (none provided)
-                    mock_args = Mock()
-                    mock_args.username = None
-                    mock_args.password = None
-                    mock_parser = Mock()
-                    mock_parser.parse_args.return_value = mock_args
-                    mock_argparser.return_value = mock_parser
-                    
-                    # Setup environment vars
-                    mock_getenv.side_effect = lambda key: {
-                        "MOODLE_USERNAME": "env_user",
-                        "MOODLE_PASSWORD": "env_pass"
-                    }.get(key)
-                    
-                    # Call function
-                    result = parse_args()
-                    
-                    # Verify results
-                    assert result.username == "env_user"
-                    assert result.password == "env_pass"
-                    mock_getenv.assert_any_call("MOODLE_USERNAME")
-                    mock_getenv.assert_any_call("MOODLE_PASSWORD")
-                
-                @patch("moodle_painkillers.argparse.ArgumentParser")
-                @patch("moodle_painkillers.os.getenv")
-                def test_parse_args_precedence(self, mock_getenv, mock_argparser):
-                    # Setup mock for command line args (username only)
-                    mock_args = Mock()
-                    mock_args.username = "cli_user"
-                    mock_args.password = None
-                    mock_parser = Mock()
-                    mock_parser.parse_args.return_value = mock_args
-                    mock_argparser.return_value = mock_parser
-                    
-                    # Setup environment vars (both username and password)
-                    mock_getenv.side_effect = lambda key: {
-                        "MOODLE_USERNAME": "env_user",
-                        "MOODLE_PASSWORD": "env_pass"
-                    }.get(key)
-                    
-                    # Call function
-                    result = parse_args()
-                    
-                    # Verify results - CLI username should take precedence
-                    assert result.username == "cli_user"
-                    assert result.password == "env_pass"
-                
-                @patch("moodle_painkillers.argparse.ArgumentParser")
-                @patch("moodle_painkillers.os.getenv")
-                def test_parse_args_missing_username(self, mock_getenv, mock_argparser):
-                    # Setup mock for command line args (none provided)
-                    mock_args = Mock()
-                    mock_args.username = None
-                    mock_args.password = "cli_pass"
-                    mock_parser = Mock()
-                    mock_parser.parse_args.return_value = mock_args
-                    mock_argparser.return_value = mock_parser
-                    
-                    # Setup environment vars (no username)
-                    mock_getenv.side_effect = lambda key: {
-                        "MOODLE_USERNAME": None,
-                        "MOODLE_PASSWORD": "env_pass"
-                    }.get(key)
-                    
-                    # Call function and expect error
-                    with pytest.raises(NameError, match="Missing Moodle credentials"):
-                        parse_args()
-                
-                @patch("moodle_painkillers.argparse.ArgumentParser")
-                @patch("moodle_painkillers.os.getenv")
-                def test_parse_args_missing_password(self, mock_getenv, mock_argparser):
-                    # Setup mock for command line args (none provided)
-                    mock_args = Mock()
-                    mock_args.username = "cli_user"
-                    mock_args.password = None
-                    mock_parser = Mock()
-                    mock_parser.parse_args.return_value = mock_args
-                    mock_argparser.return_value = mock_parser
-                    
-                    # Setup environment vars (no password)
-                    mock_getenv.side_effect = lambda key: {
-                        "MOODLE_USERNAME": "env_user",
-                        "MOODLE_PASSWORD": None
-                    }.get(key)
-                    
-                    # Call function and expect error
-                    with pytest.raises(NameError, match="Missing Moodle credentials"):
-                        parse_args()
+
 
