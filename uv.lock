@@ -280,7 +280,7 @@ wheels = [
 
 [[package]]
 name = "moodle-painkillers"
-version = "1.0.0"
+version = "1.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
