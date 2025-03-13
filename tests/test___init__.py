@@ -245,7 +245,7 @@ class TestAuthenticateOnMoodle:
         ]
 
         # Verify exception is raised when RelayState is not found
-        with pytest.raises(ValueError, match="Element RelayState introuvable"):
+        with pytest.raises(Exception, match="Failed to extract SAML response parameters. Are the credentials correct?"):
             authenticate_on_moodle(
                 mock_session, "test_username", "test_password"
             )

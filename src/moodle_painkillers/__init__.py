@@ -110,8 +110,12 @@ def authenticate_on_moodle(
     soup = bs4.BeautifulSoup(res.text, "html.parser")
 
     log.debug("Extracting SAML response parameters")
-    relaystate_value = get_hidden_input_value(soup, "RelayState")
-    samlresponse_value = get_hidden_input_value(soup, "SAMLResponse")
+    try:
+        relaystate_value = get_hidden_input_value(soup, "RelayState")
+        samlresponse_value = get_hidden_input_value(soup, "SAMLResponse")
+    except ValueError as e:
+        log.error("Failed to extract SAML response parameters")
+        raise Exception("Failed to extract SAML response parameters. Are the credentials correct?") from e
 
     log.debug("Posting SAML response to service provider")
     res = session.post(
