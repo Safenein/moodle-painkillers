@@ -56,6 +56,7 @@ class MoodleAuthenticatedSession(rq.Session):
         ...     # Use the authenticated session for further requests
         Exception: If authentication fails due to incorrect credentials or network issues
     """
+
     username: str
     password: str
 
@@ -74,9 +75,7 @@ class MoodleAuthenticatedSession(rq.Session):
     def __exit__(self, *_):
         self.close()
 
-    def authenticate_on_moodle(
-        self, username: str, password: str
-    ) -> None:
+    def authenticate_on_moodle(self, username: str, password: str) -> None:
         """
         Authenticate a user on the Moodle platform using Shibboleth.
 
@@ -96,7 +95,7 @@ class MoodleAuthenticatedSession(rq.Session):
         """
         log.info("Starting Moodle authentication process")
         log.debug(f"Authenticating user: {username}")
-        
+
         log.debug("Requesting Shibboleth login page")
         res = self.get(
             "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
@@ -115,7 +114,9 @@ class MoodleAuthenticatedSession(rq.Session):
         )
 
         if res.status_code != 200:
-            log.error(f"Failed to authenticate on login page: HTTP {res.status_code}")
+            log.error(
+                f"Failed to authenticate on login page: HTTP {res.status_code}"
+            )
             raise Exception(
                 f"{res.status_code} Failed to authenticate on login page"
             )
@@ -147,7 +148,9 @@ class MoodleAuthenticatedSession(rq.Session):
             samlresponse_value = get_hidden_input_value(soup, "SAMLResponse")
         except ValueError as e:
             log.error("Failed to extract SAML response parameters")
-            raise Exception("Failed to extract SAML response parameters. Are the credentials correct?") from e
+            raise Exception(
+                "Failed to extract SAML response parameters. Are the credentials correct?"
+            ) from e
 
         log.debug("Posting SAML response to service provider")
         res = self.post(
@@ -157,6 +160,5 @@ class MoodleAuthenticatedSession(rq.Session):
                 "SAMLResponse": samlresponse_value,
             },
         )
-        
-        log.info("Authentication completed successfully")
 
+        log.info("Authentication completed successfully")

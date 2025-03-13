@@ -16,16 +16,16 @@ log = logging.getLogger(__name__)
 try:
     from rich.traceback import install as install_rich_traceback
     from rich.logging import RichHandler
-    
+
     # Install rich traceback for better exception visualization
     _ = install_rich_traceback(show_locals=True)
-    
+
     # Set up rich logging
     logging.basicConfig(
         level=logging.INFO,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True)]
+        handlers=[RichHandler(rich_tracebacks=True)],
     )
     logger = logging.getLogger("moodle_painkillers")
     logger.info("Rich logger and traceback installed")
@@ -34,7 +34,6 @@ except ImportError:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("moodle_painkillers")
     logger.info("Standard logging initialized (Rich not available)")
-
 
 
 def register_presence_status(session: rq.Session) -> None:
@@ -53,7 +52,7 @@ def register_presence_status(session: rq.Session) -> None:
         Exception: If the presence status registration fails.
     """
     log.info("Starting presence status registration process")
-    
+
     log.debug("Requesting attendance page")
     res = session.get(
         "https://moodle.univ-ubs.fr/mod/attendance/view.php?id=433340"
@@ -66,7 +65,9 @@ def register_presence_status(session: rq.Session) -> None:
     a_element = soup.find("a", string="Envoyer le statut de présence")
     if not a_element:
         log.error("Could not find the presence status link on the page")
-        raise Exception("Could not find the send status cell. Did you already checked in?")
+        raise Exception(
+            "Could not find the send status cell. Did you already checked in?"
+        )
     assert isinstance(a_element, bs4.element.Tag)
 
     link_status_href = a_element["href"]
@@ -93,6 +94,7 @@ class Args:
         discord_webhook (str): The Discord webhook URL for notifications.
 
     """
+
     username: str
     password: str
     discord_webhook: str | None
@@ -111,10 +113,21 @@ def parse_args():
                    command line arguments and environment variables.
     """
     log.debug("Parsing command line arguments")
-    parser = argparse.ArgumentParser(description="Moodle presence registration tool")
-    _ = parser.add_argument("--username", "-u", help="Moodle username", type=str)
-    _ = parser.add_argument("--password", "-p", help="Moodle password", type=str)
-    _ = parser.add_argument("--discord-webhook", "-w", help="Discord webhook URL for notifications", type=str)
+    parser = argparse.ArgumentParser(
+        description="Moodle presence registration tool"
+    )
+    _ = parser.add_argument(
+        "--username", "-u", help="Moodle username", type=str
+    )
+    _ = parser.add_argument(
+        "--password", "-p", help="Moodle password", type=str
+    )
+    _ = parser.add_argument(
+        "--discord-webhook",
+        "-w",
+        help="Discord webhook URL for notifications",
+        type=str,
+    )
     args = parser.parse_args()
 
     # Get credentials from environment variables as fallback
@@ -125,10 +138,16 @@ def parse_args():
     log.debug("Checking if credentials are provided")
     if not moodle_username or not moodle_password:
         log.error("Missing Moodle credentials")
-        raise NameError("Missing Moodle credentials. Provide them via command line arguments or environment variables.")
-    
+        raise NameError(
+            "Missing Moodle credentials. Provide them via command line arguments or environment variables."
+        )
+
     log.debug("Arguments parsed successfully")
-    return Args(username=moodle_username, password=moodle_password, discord_webhook=discord_webhook)
+    return Args(
+        username=moodle_username,
+        password=moodle_password,
+        discord_webhook=discord_webhook,
+    )
 
 
 def notify_on_fail(func: Callable[[Any], Any]):
@@ -141,6 +160,7 @@ def notify_on_fail(func: Callable[[Any], Any]):
     Returns:
         callable: The decorated function.
     """
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -148,6 +168,7 @@ def notify_on_fail(func: Callable[[Any], Any]):
             log.error(f"An error occurred: {str(e)}")
             _ = send_notification(str(e))
             raise e
+
     return wrapper
 
 
@@ -185,9 +206,11 @@ def main() -> None:
 
         # Register presence status
         register_presence_status(session)
-    
+
     log.info("Presence registration process completed successfully")
-    _ = send_notification("Sent presence status!", discord_webhook=args.discord_webhook)
+    _ = send_notification(
+        "Sent presence status!", discord_webhook=args.discord_webhook
+    )
 
     return
 
