@@ -1,132 +1,40 @@
 import os
 import requests as rq
-from logging import getLogger
+import logging
 from dataclasses import dataclass
 import bs4
 import argparse
+from typing import Any, Callable
+
+from .desktop_notifications import send_notification
+from .moodle_authenticate import MoodleAuthenticatedSession
 
 
-log = getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
-def get_hidden_input_value(soup: bs4.BeautifulSoup, name: str) -> str:
-    """
-    Retrieve the value of a hidden input element from a BeautifulSoup object.
-
-    Args:
-        soup (bs4.BeautifulSoup): The BeautifulSoup object containing the HTML.
-        name (str): The name attribute of the hidden input element to find.
-
-    Returns:
-        str: The value of the hidden input element.
-
-    Raises:
-        AssertionError: If the soup is not a BeautifulSoup object or name is not a string.
-        ValueError: If the hidden input element with the specified name is not found.
-    """
-    log.debug(f"Getting hidden input value for element named '{name}'")
-    assert isinstance(soup, bs4.BeautifulSoup), "Invalid soup"
-    assert isinstance(name, str), "Invalid name"
-
-    input_element = soup.find("input", {"type": "hidden", "name": name})
-
-    if not input_element:
-        log.error(f"Hidden input element '{name}' not found in the HTML")
-        raise ValueError(f"Element {name} introuvable")
-
-    assert isinstance(input_element, bs4.element.Tag)
-    value = input_element["value"]
-
-    assert isinstance(value, str), "Invalid value"
-    log.debug(f"Found hidden input value for '{name}'")
-    return value
-
-
-def authenticate_on_moodle(
-    session: rq.Session, username: str, password: str
-) -> None:
-    """
-    Authenticate a user on the Moodle platform using Shibboleth.
-
-    This function performs a series of HTTP requests to authenticate a user on the Moodle platform
-    of the University of South Brittany (Université de Bretagne Sud) using Shibboleth.
-
-    Args:
-        session (rq.Session): The requests session object to maintain the session.
-        username (str): The username of the user.
-        password (str): The password of the user.
-
-    Raises:
-        Exception: If any of the HTTP requests fail (status code is not 200).
-
-    Returns:
-        None
-    """
-    log.info("Starting Moodle authentication process")
-    log.debug(f"Authenticating user: {username}")
+try:
+    from rich.traceback import install as install_rich_traceback
+    from rich.logging import RichHandler
     
-    log.debug("Requesting Shibboleth login page")
-    res = session.get(
-        "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
-    )
-
-    if res.status_code != 200:
-        log.error(f"Failed to get login page: HTTP {res.status_code}")
-        raise Exception(f"{res.status_code} Failed to get login page")
-
-    log.debug("Posting to Shibboleth login page")
-    # Post the login form to be redirected on the shibboleth login page
-    res = session.post(
-        "https://moodle.univ-ubs.fr/auth/shibboleth/login.php",
-        cookies=res.cookies,
-        data={"idp": "urn:mace:cru.fr:federation:univ-ubs.fr"},
-    )
-
-    if res.status_code != 200:
-        log.error(f"Failed to authenticate on login page: HTTP {res.status_code}")
-        raise Exception(
-            f"{res.status_code} Failed to authenticate on login page"
-        )
-
-    log.debug("Parsing login response page")
-    soup = bs4.BeautifulSoup(res.text, "html.parser")
-
-    execution_value = get_hidden_input_value(soup, "execution")
-
-    log.debug("Submitting credentials to Shibboleth")
-    # Authenticate on shibboleth
-    res = session.post(
-        res.url.split("?")[0],
-        data={
-            "username": username,
-            "password": password,
-            "execution": execution_value,
-            "_eventId": "submit",
-            "geolocation": "",
-        },
-    )
-
-    log.debug("Parsing authentication response")
-    soup = bs4.BeautifulSoup(res.text, "html.parser")
-
-    log.debug("Extracting SAML response parameters")
-    try:
-        relaystate_value = get_hidden_input_value(soup, "RelayState")
-        samlresponse_value = get_hidden_input_value(soup, "SAMLResponse")
-    except ValueError as e:
-        log.error("Failed to extract SAML response parameters")
-        raise Exception("Failed to extract SAML response parameters. Are the credentials correct?") from e
-
-    log.debug("Posting SAML response to service provider")
-    res = session.post(
-        "https://moodle.univ-ubs.fr/Shibboleth.sso/SAML2/POST",
-        data={
-            "RelayState": relaystate_value,
-            "SAMLResponse": samlresponse_value,
-        },
-    )
+    # Install rich traceback for better exception visualization
+    _ = install_rich_traceback(show_locals=True)
     
-    log.info("Authentication completed successfully")
+    # Set up rich logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True)]
+    )
+    logger = logging.getLogger("moodle_painkillers")
+    logger.info("Rich logger and traceback installed")
+except ImportError:
+    # Rich is not available, use standard logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("moodle_painkillers")
+    logger.info("Standard logging initialized (Rich not available)")
+
 
 
 def register_presence_status(session: rq.Session) -> None:
@@ -187,7 +95,7 @@ class Args:
     """
     username: str
     password: str
-    discord_webhook: str
+    discord_webhook: str | None
 
 
 def parse_args():
@@ -204,15 +112,15 @@ def parse_args():
     """
     log.debug("Parsing command line arguments")
     parser = argparse.ArgumentParser(description="Moodle presence registration tool")
-    parser.add_argument("--username", "-u", help="Moodle username")
-    parser.add_argument("--password", "-p", help="Moodle password")
-    parser.add_argument("--discord-webhook", "-w", help="Discord webhook URL for notifications")
+    _ = parser.add_argument("--username", "-u", help="Moodle username", type=str)
+    _ = parser.add_argument("--password", "-p", help="Moodle password", type=str)
+    _ = parser.add_argument("--discord-webhook", "-w", help="Discord webhook URL for notifications", type=str)
     args = parser.parse_args()
-    
+
     # Get credentials from environment variables as fallback
     moodle_username = args.username or os.getenv("MOODLE_USERNAME") or ""
     moodle_password = args.password or os.getenv("MOODLE_PASSWORD") or ""
-    discord_webhook = args.discord_webhook or os.getenv("DISCORD_WEBHOOK") or ""
+    discord_webhook = args.discord_webhook or os.getenv("DISCORD_WEBHOOK")
 
     log.debug("Checking if credentials are provided")
     if not moodle_username or not moodle_password:
@@ -223,40 +131,66 @@ def parse_args():
     return Args(username=moodle_username, password=moodle_password, discord_webhook=discord_webhook)
 
 
-def main(args: Args | None = None):
+def notify_on_fail(func: Callable[[Any], Any]):
     """
-    Main function to authenticate on Moodle and register presence status.
+    Decorator to send a notification in case of failure.
 
-    This function retrieves the Moodle username and password from environment variables,
-    opens a session, authenticates on Moodle, registers the presence status, and then
-    closes the session.
+    Args:
+        func (callable): The function to decorate.
 
-    Raises:
-        NameError: If either MOODLE_USERNAME or MOODLE_PASSWORD environment variables are missing.
+    Returns:
+        callable: The decorated function.
+    """
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            log.error(f"An error occurred: {str(e)}")
+            _ = send_notification(str(e))
+            raise e
+    return wrapper
+
+
+@notify_on_fail
+def main() -> None:
+    """
+    Execute the Moodle presence registration workflow.
+    This function orchestrates the entire process of registering a presence status on Moodle:
+    1. Retrieves credentials and arguments from command line or environment variables
+    2. Creates an HTTP session
+    3. Authenticates to the Moodle platform
+    4. Registers the user's presence status
+    5. Sends a notification upon successful completion
+    Returns:
+        None
+    Side Effects:
+        - Creates and closes an HTTP session
+        - Authenticates to Moodle
+        - Registers presence on Moodle
+        - Logs information about the process
+        - Sends a notification when complete
     """
     log.info("Starting Moodle presence registration process")
 
     # Get moodle username and password from environment variables
-    args = args or parse_args()
+    args = parse_args()
+
     log.debug("Arguments obtained")
 
     # Open a session
     log.debug("Creating new HTTP session")
-    session = rq.Session()
-
     # Authenticate on moodle
-    authenticate_on_moodle(session, args.username, args.password)
+    with MoodleAuthenticatedSession(args.username, args.password) as session:
+        log.debug("Authenticated on Moodle")
 
-    # Register presence status
-    register_presence_status(session)
-
-    log.debug("Closing HTTP session")
-    session.close()
+        # Register presence status
+        register_presence_status(session)
     
     log.info("Presence registration process completed successfully")
+    _ = send_notification("Sent presence status!", discord_webhook=args.discord_webhook)
 
     return
 
 
 if __name__ == "__main__":
-    main(None)
+    main()
