@@ -1,6 +1,6 @@
 [project]
 name = "moodle-painkillers"
-version = "1.0.0"
+version = "1.0.4"
 description = "Signs you up on Moodle so you get paid."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-moodle-painkillers = "moodle_painkillers:main"
+moodle-painkillers = "moodle_painkillers:__main__"
 
 [project.optional-dependencies]
 desktop = [
