@@ -244,7 +244,7 @@ class TestNotifyOnFail:
         assert excinfo.value == test_exception
 
         # Verify send_notification was called with the exception message
-        mock_send_notification.assert_called_once_with("test error")
+        mock_send_notification.assert_called_once_with('test error', title='Moodle Presence Registration')
 
     @patch("moodle_painkillers.send_notification")
     def test_with_arguments(self, mock_send_notification):

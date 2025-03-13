@@ -7,10 +7,13 @@ from typing import Any, Callable
 import bs4
 import requests as rq
 
-from .desktop_notifications import send_notification
+from .notifications import send_notification
 from .moodle_authenticate import MoodleAuthenticatedSession
 
 log = logging.getLogger(__name__)
+
+
+NOTIFICATION_TITLE = "Moodle Presence Registration"
 
 
 try:
@@ -166,7 +169,7 @@ def notify_on_fail(func: Callable[[Any], Any]):
             return func(*args, **kwargs)
         except Exception as e:
             log.error(f"An error occurred: {str(e)}")
-            _ = send_notification(str(e))
+            send_notification(str(e), title=NOTIFICATION_TITLE)
             raise e
 
     return wrapper
