@@ -38,21 +38,10 @@ def _send_windows_notification(message):
 
 def _send_macos_notification(message):
     """Send a notification on macOS systems"""
-    try:
-        log.debug("Attempting to send macOS notification via pync")
-        pync.notify(message, title="Notification")
-        log.info("macOS notification sent successfully via pync")
-        return True
-    except ImportError:
-        log.warning("pync not available, falling back to AppleScript for macOS notification")
-        try:
-            cmd = ['osascript', '-e', f'display notification "{message}" with title "Notification"']
-            subprocess.run(cmd, check=True)
-            log.info("macOS notification sent successfully via AppleScript")
-            return True
-        except (subprocess.SubprocessError, FileNotFoundError):
-            log.error("Could not send notification on macOS")
-            return False
+    log.debug("Attempting to send macOS notification via pync")
+    pync.notify(message, title="Moodle Painkillers")
+    log.info("macOS notification sent successfully via pync")
+    return True
 
 def _send_linux_notification(message):
     """Send a notification on Linux systems"""
