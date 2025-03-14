@@ -1,4 +1,3 @@
-import shutil
 import subprocess
 from logging import getLogger
 
@@ -15,8 +14,10 @@ def send_notification(message: str, title: str) -> None:
         cmd = ["notify-send", title, message]
         _ = subprocess.run(cmd, check=True)
         log.info("Linux notification sent successfully")
-    except subprocess.SubprocessError as e:
-        log.fatal(f"Could not send notification on Linux: {e}")
-        raise
-    except FileNotFoundError as e:
-        log.fatal(f"Could not send notification on Linux: {e}")
+    except Exception as e:
+        try:
+            cmd = ["termux-notification", "-t", title, "-c", message]
+            _ = subprocess.run(cmd, check=True)
+            log.info("Linux notification sent successfully")
+        except Exception as e:
+            log.fatal(f"Could not send notification on Linux: {e}")
